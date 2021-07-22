@@ -43,6 +43,7 @@ export default function Home() {
       .transfer("0x73D20479390E1acdB243570b5B739655989412f5", "1")
       .sendAndWaitForReceipt({
         from: kit.defaultAccount,
+        feeCurrency: cusd.address,
       });
 
     alert(receipt.transactionHash);

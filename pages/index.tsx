@@ -1,128 +1,50 @@
-import Head from "next/head";
-import WalletConnectClient, { CLIENT_EVENTS } from "@walletconnect/client";
-import { PairingTypes, SessionTypes } from "@walletconnect/types";
-import { useCallback, useContext, useEffect, useState } from "react";
-import { ethers } from "ethers";
-import { newKit } from "@celo/contractkit";
-import ERC20Abi from "../abis/ERC20.json";
+import { ContractKit, newKit, StableToken } from "@celo/contractkit";
 import { WalletConnectWallet } from "@celo/wallet-walletconnect";
+import Head from "next/head";
+import { useCallback, useState } from "react";
 
 export default function Home() {
-  const [client, setClient] = useState<WalletConnectClient | null>(null);
+  const [kit, setKit] = useState<ContractKit | null>(null);
   const [uri, setUri] = useState("");
-  const [account, setAccount] = useState("");
-  const [session, setSession] = useState<SessionTypes.Settled | null>(null);
 
   const initialise = useCallback(async () => {
-    const _client = await WalletConnectClient.init({
-      relayProvider: "wss://walletconnect.celo.org",
-      metadata: {
-        name: "Celo x WalletConnect",
-        description: "Example Dapp showcasing WalletConnect and Celo",
-        url: "https://eth-cc-celo-walletconnect.com",
-        icons: ["https://walletconnect.org/walletconnect-logo.png"],
+    const wallet = new WalletConnectWallet({
+      connect: {
+        metadata: {
+          name: "Celo x WalletConnect",
+          description: "Example Dapp showcasing WalletConnect and Celo",
+          url: "https://eth-cc-celo-walletconnect.com",
+          icons: ["https://walletconnect.org/walletconnect-logo.png"],
+        },
       },
-    });
-    _client.on(
-      CLIENT_EVENTS.pairing.proposal,
-      async ({
-        signal: {
-          params: { uri },
-        },
-      }: PairingTypes.Proposal) => setUri(uri)
-    );
-
-    const _session = await _client.connect({
-      permissions: {
-        blockchain: {
-          chains: ["celo:42220"],
-        },
-        jsonrpc: {
-          methods: ["eth_signTransaction", "personal_sign"],
-        },
+      init: {
+        relayProvider: "wss://walletconnect.celo.org",
       },
     });
 
-    setAccount(_session.state.accounts[0]);
-    setSession(_session);
-    setClient(_client);
+    const _uri = await wallet.getUri();
+    setUri(_uri!);
+    await wallet.init();
+
+    const [from] = await wallet.getAccounts();
+    const _kit = newKit("https://forno.celo.org", wallet);
+    _kit.defaultAccount = from;
+    setKit(_kit);
   }, []);
 
   const transfer = useCallback(async () => {
-    if (!client || !session || !account) {
-      return;
-    }
-    console.log(session);
-
-    // const kit = newKit("https://forno.celo.org");
-    // const celo = await kit.contracts.getGoldToken();
-    // console.log(celo.transfer("0x765DE816845861e75A25fCA122bb6898B8B1282a", 1).txo.);
-
-    const provider = new ethers.providers.JsonRpcProvider(
-      "https://forno.celo.org"
-    );
-    const erc20 = new ethers.Contract(
-      "0x765DE816845861e75A25fCA122bb6898B8B1282a",
-      ERC20Abi,
-      provider
-    );
-    const output = erc20.transfer(
-      "0xF0109fC8DF283027b6285cc889F5aA624EaC1F55",
-      ethers.utils.parseEther("1")
-    );
-    console.log(output);
-
-    const result = await client.request({
-      topic: session.topic,
-      chainId: "celo:42220",
-      request: {
-        method: "eth_signTransaction",
-        params: JSON.stringify([
-          {
-            data: "0x1234",
-            to: "",
-            // value: ),
-            from: account.split("@")[0],
-            gas: 30_000,
-            gasPrice: ethers.utils.parseUnits("5", "gwei"),
-            nonce: 1,
-            chainId: 42220,
-            feeCurrency: "0x",
-            gatewayFeeRecipient: "0x",
-            gatewayFee: "0x",
-          },
-        ]),
-        // method: "personal_sign",
-        // params: JSON.stringify([
-        //   account.split("@")[0],
-        //   "0x" + Buffer.from("data").toString("hex"),
-        // ]),
-      },
-    });
-
-    console.log("> result", result);
-
-    // provider.send("eth_sendRawTransaction", []);
-  }, [client, session, account]);
-
-  const sign = useCallback(async () => {
-    if (!client || !session || !account) {
+    if (!kit) {
       return;
     }
 
-    const result = await client.request({
-      topic: session.topic,
-      chainId: "celo:42220",
-      request: {
-        method: "personal_sign",
-        params: JSON.stringify([
-          "0x" + Buffer.from("data").toString("hex"),
-          account.split("@")[0],
-        ]),
-      },
-    });
-    alert(result);
-  }, [client, session, account]);
+    const celo = await kit.contracts.getStableToken(StableToken.cUSD);
+
+    const receipt = await celo
+      .transfer("0x73D20479390E1acdB243570b5B739655989412f5", "1")
+      .sendAndWaitForReceipt({ from: kit.defaultAccount });
+
+    alert(receipt.transactionHash);
+  }, [kit]);
 
   return (
     <div>
@@ -137,21 +59,15 @@ export default function Home() {
           Welcome to the Celo x WalletConnect workshop!
         </h1>
 
-        {account ? (
+        {kit ? (
           <div className="space-y-4">
             <span>Connected to account: </span>
-            <code>{account}</code>
+            <code>{kit.defaultAccount}</code>
             <button
               onClick={transfer}
               className="block bg-blue-500 text-white px-4 py-2 rounded"
             >
               Transfer
-            </button>
-            <button
-              onClick={sign}
-              className="block bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Sign
             </button>
           </div>
         ) : (

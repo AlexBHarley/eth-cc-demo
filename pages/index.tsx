@@ -37,11 +37,13 @@ export default function Home() {
       return;
     }
 
-    const celo = await kit.contracts.getStableToken(StableToken.cUSD);
+    const cusd = await kit.contracts.getStableToken(StableToken.cUSD);
 
-    const receipt = await celo
+    const receipt = await cusd
       .transfer("0x73D20479390E1acdB243570b5B739655989412f5", "1")
-      .sendAndWaitForReceipt({ from: kit.defaultAccount });
+      .sendAndWaitForReceipt({
+        from: kit.defaultAccount,
+      });
 
     alert(receipt.transactionHash);
   }, [kit]);

@@ -9,8 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@celo-tools/use-contractkit": "^1.0.6",
     "@celo/contractkit": "^1.2.4",
     "@celo/wallet-walletconnect": "^1.2.4",
+    "@json-rpc-tools/provider": "^1.7.6",
     "@walletconnect/client": "2.0.0-beta.14",
     "ethers": "^5.4.1",
     "next": "11.0.1",

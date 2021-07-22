@@ -1,53 +1,25 @@
-import { ContractKit, newKit, StableToken } from "@celo/contractkit";
-import { WalletConnectWallet } from "@celo/wallet-walletconnect";
+import { useContractKit } from "@celo-tools/use-contractkit";
+import { StableToken } from "@celo/contractkit";
 import Head from "next/head";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 
 export default function Home() {
-  const [kit, setKit] = useState<ContractKit | null>(null);
-  const [uri, setUri] = useState("");
-
-  const initialise = useCallback(async () => {
-    const wallet = new WalletConnectWallet({
-      connect: {
-        metadata: {
-          name: "Celo x WalletConnect",
-          description: "Example Dapp showcasing WalletConnect and Celo",
-          url: "https://eth-cc-celo-walletconnect.com",
-          icons: ["https://walletconnect.org/walletconnect-logo.png"],
-        },
-      },
-      init: {
-        relayProvider: "wss://walletconnect.celo.org",
-      },
-    });
-
-    const _uri = await wallet.getUri();
-    setUri(_uri!);
-    await wallet.init();
-
-    const [from] = await wallet.getAccounts();
-    const _kit = newKit("https://forno.celo.org", wallet);
-    _kit.defaultAccount = from;
-    setKit(_kit);
-  }, []);
+  const { kit, connect, performActions } = useContractKit();
 
   const transfer = useCallback(async () => {
-    if (!kit) {
-      return;
-    }
+    await performActions(async (_kit) => {
+      const cusd = await kit.contracts.getStableToken(StableToken.cUSD);
 
-    const cusd = await kit.contracts.getStableToken(StableToken.cUSD);
+      const receipt = await cusd
+        .transfer("0x73D20479390E1acdB243570b5B739655989412f5", "1")
+        .sendAndWaitForReceipt({
+          from: _kit.defaultAccount,
+          feeCurrency: cusd.address,
+        });
 
-    const receipt = await cusd
-      .transfer("0x73D20479390E1acdB243570b5B739655989412f5", "1")
-      .sendAndWaitForReceipt({
-        from: kit.defaultAccount,
-        feeCurrency: cusd.address,
-      });
-
-    alert(receipt.transactionHash);
-  }, [kit]);
+      alert(receipt.transactionHash);
+    });
+  }, [performActions]);
 
   return (
     <div>
@@ -62,7 +34,7 @@ export default function Home() {
           Welcome to the Celo x WalletConnect workshop!
         </h1>
 
-        {kit ? (
+        {kit.defaultAccount ? (
           <div className="space-y-4">
             <span>Connected to account: </span>
             <code>{kit.defaultAccount}</code>
@@ -76,18 +48,11 @@ export default function Home() {
         ) : (
           <>
             <button
-              onClick={initialise}
+              onClick={connect}
               className="bg-blue-500 text-white px-4 py-2 rounded"
             >
               Connect
             </button>
-
-            {uri && (
-              <div>
-                <div>Use this URI to connect</div>
-                <code>{uri}</code>
-              </div>
-            )}
           </>
         )}
       </main>
